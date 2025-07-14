@@ -1,178 +1,205 @@
--- ESP + Fly com UI Mobile-Friendly
--- Autor: kawai (adaptado para mobile)
+--// ESP + Fly | Fluent UI
+--// Mobile-friendly | GitHub RAW ready
+--// Autor: kawai
 
+local repo = "https://raw.githubusercontent.com/dawid-scripts/Fluent/master/"
+
+local Library = loadstring(game:HttpGet(repo .. "Library.lua"))()
+local SaveManager = loadstring(game:HttpGet(repo .. "addons/SaveManager.lua"))()
+local InterfaceManager = loadstring(game:HttpGet(repo .. "addons/InterfaceManager.lua"))()
+
+local Window = Library:CreateWindow({
+    Title = "ESP & Fly | Mobile Ready",
+    SubTitle = "by kawai",
+    TabWidth = 160,
+    Size = UDim2.fromOffset(580, 460),
+    Acrylic = true,
+    Theme = "Dark",
+    MinimizeKey = Enum.KeyCode.LeftControl,
+    DisableRay = false,
+    DisableMenuAnchor = true
+})
+
+local Tabs = {
+    ESP = Window:AddTab({ Title = "ESP", Icon = "eye" }),
+    Fly = Window:AddTab({ Title = "Fly", Icon = "wind" }),
+    Settings = Window:AddTab({ Title = "Settings", Icon = "settings" })
+}
+
+-- Services
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
-local TweenService = game:GetService("TweenService")
-
-local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
+local LocalPlayer = Players.LocalPlayer
 local ESPFolder = Instance.new("Folder")
-ESPFolder.Name = "ESPFolder"
-ESPFolder.Parent = game.CoreGui
+ESPFolder.Name = "ESPObjects"
+ESPFolder.Parent = game:GetService("CoreGui")
 
-local FlyEnabled = false
+-- ESP
 local ESPEnabled = false
+local BoxColor = Color3.new(1, 1, 1)
+local UseTeamColor = false
 
--- UI Library (mobile-friendly)
-local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/wally-rblx/uwuware-ui/main/main.lua"))()
-local Window = Library:CreateWindow("ESP & Fly", UDim2.new(0, 300, 0, 400))
-
-local ESPtab = Window:AddTab("ESP")
-local Flytab = Window:AddTab("Fly")
-local Configtab = Window:AddTab("Config")
-
--- ESP Toggle
-ESPtab:AddToggle("Ativar ESP", function(state)
-    ESPEnabled = state
-end)
-
--- Fly Toggle
-Flytab:AddToggle("Ativar Fly", function(state)
-    FlyEnabled = state
-    if FlyEnabled then
-        startFly()
-    else
-        stopFly()
-    end
-end)
-
--- Config
-Configtab:AddSlider("Tamanho da Box", 1, 10, 5, function(val)
-    _G.BoxSize = val
-end)
-
--- ESP Functions
 local function createESP(player)
     local Box = Drawing.new("Square")
-    Box.Visible = false
-    Box.Color = Color3.fromRGB(255, 255, 255)
-    Box.Thickness = 1
-    Box.Filled = false
-
+    local NameText = Drawing.new("Text")
     local Line = Drawing.new("Line")
-    Line.Visible = false
-    Line.Color = Color3.fromRGB(255, 255, 255)
-    Line.Thickness = 1
 
-    local Text = Drawing.new("Text")
-    Text.Visible = false
-    Text.Color = Color3.fromRGB(255, 255, 255)
-    Text.Size = 16
-    Text.Center = true
-    Text.Outline = true
+    local function update()
+        if not ESPEnabled then
+            Box.Visible = false
+            NameText.Visible = false
+            Line.Visible = false
+            return
+        end
 
-    local function updateESP()
-        if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-            local root = player.Character.HumanoidRootPart
-            local vector, onScreen = Camera:WorldToViewportPoint(root.Position)
+        local character = player.Character
+        if not character or not character:FindFirstChild("HumanoidRootPart") then return end
 
-            if onScreen and ESPEnabled then
-                local topY = Camera:WorldToViewportPoint((root.CFrame * CFrame.new(0, 3, 0)).Position).Y
-                local bottomY = Camera:WorldToViewportPoint((root.CFrame * CFrame.new(0, -3, 0)).Position).Y
-                local height = bottomY - topY
-                local width = height / 2
+        local root = character.HumanoidRootPart
+        local vector, onScreen = Camera:WorldToViewportPoint(root.Position)
 
-                Box.Visible = true
-                Box.Size = Vector2.new(width * (_G.BoxSize or 1), height)
-                Box.Position = Vector2.new(vector.X - Box.Size.X / 2, topY)
+        if onScreen then
+            local topY = Camera:WorldToViewportPoint((root.CFrame * CFrame.new(0, 3, 0)).Position).Y
+            local bottomY = Camera:WorldToViewportPoint((root.CFrame * CFrame.new(0, -3, 0)).Position).Y
+            local height = bottomY - topY
+            local width = height / 2
 
-                Line.Visible = true
-                Line.From = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)
-                Line.To = Vector2.new(vector.X, bottomY)
+            Box.Visible = true
+            Box.Size = Vector2.new(width, height)
+            Box.Position = Vector2.new(vector.X - width / 2, topY)
+            Box.Color = UseTeamColor and (player.Team and player.TeamColor.Color or BoxColor) or BoxColor
+            Box.Thickness = 1
+            Box.Filled = false
 
-                Text.Visible = true
-                Text.Position = Vector2.new(vector.X, topY - 20)
-                Text.Text = player.Name .. " [" .. math.floor((root.Position - LocalPlayer.Character.HumanoidRootPart.Position).Magnitude) .. "m]"
-            else
-                Box.Visible = false
-                Line.Visible = false
-                Text.Visible = false
-            end
+            NameText.Visible = true
+            NameText.Text = player.Name .. " [" .. math.floor((root.Position - LocalPlayer.Character.HumanoidRootPart.Position).Magnitude) .. "m]"
+            NameText.Position = Vector2.new(vector.X, topY - 15)
+            NameText.Size = 16
+            NameText.Center = true
+            NameText.Outline = true
+            NameText.Color = Box.Color
+
+            Line.Visible = true
+            Line.From = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)
+            Line.To = Vector2.new(vector.X, bottomY)
+            Line.Color = Box.Color
+            Line.Thickness = 1
         else
             Box.Visible = false
+            NameText.Visible = false
             Line.Visible = false
-            Text.Visible = false
         end
     end
 
-    RunService.RenderStepped:Connect(updateESP)
+    RunService.RenderStepped:Connect(update)
 end
 
--- Auto ESP para novos jogadores
 for _, player in ipairs(Players:GetPlayers()) do
     if player ~= LocalPlayer then
         createESP(player)
     end
 end
-
 Players.PlayerAdded:Connect(createESP)
 
+-- ESP Toggle
+Tabs.ESP:AddToggle("Ativar ESP", { Title = "Ativar ESP", Default = false })
+    :OnChanged(function(value)
+        ESPEnabled = value
+    end)
+
+Tabs.ESP:AddToggle("Cor do Time", { Title = "Usar cor do time", Default = false })
+    :OnChanged(function(value)
+        UseTeamColor = value
+    end)
+
+Tabs.ESP:AddColorpicker("Cor da Box", {
+    Default = BoxColor,
+    Title = "Cor",
+    Transparency = 0
+}, function(value)
+    BoxColor = value
+end)
+
 -- Fly
-local BodyGyro, BodyVelocity
+local flying = false
+local bV, bG
+
 local function startFly()
-    if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then return end
+    if flying then return end
+    flying = true
 
-    BodyGyro = Instance.new("BodyGyro")
-    BodyGyro.MaxTorque = Vector3.new(400000, 400000, 400000)
-    BodyGyro.P = 30000
-    BodyGyro.Parent = LocalPlayer.Character.HumanoidRootPart
+    local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+    if not root then return end
 
-    BodyVelocity = Instance.new("BodyVelocity")
-    BodyVelocity.MaxForce = Vector3.new(100000, 100000, 100000)
-    BodyVelocity.Velocity = Vector3.new(0, 0, 0)
-    BodyVelocity.Parent = LocalPlayer.Character.HumanoidRootPart
+    bV = Instance.new("BodyVelocity")
+    bV.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+    bV.Velocity = Vector3.zero
+    bV.Parent = root
 
-    local function fly()
-        if FlyEnabled then
-            local vel = Vector3.new(0, 0, 0)
-            if UserInputService:IsKeyDown(Enum.KeyCode.W) then
-                vel = vel + Camera.CFrame.LookVector
-            end
-            if UserInputService:IsKeyDown(Enum.KeyCode.S) then
-                vel = vel - Camera.CFrame.LookVector
-            end
-            if UserInputService:IsKeyDown(Enum.KeyCode.A) then
-                vel = vel - Camera.CFrame.RightVector
-            end
-            if UserInputService:IsKeyDown(Enum.KeyCode.D) then
-                vel = vel + Camera.CFrame.RightVector
-            end
-            if UserInputService:IsKeyDown(Enum.KeyCode.Space) then
-                vel = vel + Vector3.new(0, 1, 0)
-            end
-            if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then
-                vel = vel - Vector3.new(0, 1, 0)
-            end
-            BodyVelocity.Velocity = vel * 50
-            BodyGyro.CFrame = Camera.CFrame
+    bG = Instance.new("BodyGyro")
+    bG.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
+    bG.P = 10000
+    bG.Parent = root
+
+    local function updateFly()
+        if not flying then return end
+        local cf = Camera.CFrame
+        local direction = Vector3.zero
+
+        local moveVector = Vector3.zero
+        if UserInputService:IsKeyDown(Enum.KeyCode.W) then
+            moveVector = moveVector + cf.LookVector
         end
+        if UserInputService:IsKeyDown(Enum.KeyCode.S) then
+            moveVector = moveVector - cf.LookVector
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.A) then
+            moveVector = moveVector - cf.RightVector
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.D) then
+            moveVector = moveVector + cf.RightVector
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.Space) then
+            moveVector = moveVector + Vector3.new(0, 1, 0)
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then
+            moveVector = moveVector - Vector3.new(0, 1, 0)
+        end
+
+        bV.Velocity = moveVector.Unit * 50
+        bG.CFrame = cf
     end
 
-    _G.FlyConnection = RunService.RenderStepped:Connect(fly)
+    _G.flyConnection = RunService.RenderStepped:Connect(updateFly)
 end
 
 local function stopFly()
-    if BodyGyro then BodyGyro:Destroy() end
-    if BodyVelocity then BodyVelocity:Destroy() end
-    if _G.FlyConnection then _G.FlyConnection:Disconnect() end
+    flying = false
+    if bV then bV:Destroy() end
+    if bG then bG:Destroy() end
+    if _G.flyConnection then _G.flyConnection:Disconnect() end
 end
 
--- Anti-ban (evita detecção)
-local meta = getrawmetatable(game)
-local oldNamecall = meta.__namecall
-setreadonly(meta, false)
+Tabs.Fly:AddToggle("Ativar Fly", { Title = "Ativar Fly", Default = false })
+    :OnChanged(function(value)
+        if value then
+            startFly()
+        else
+            stopFly()
+        end
+    end)
 
-meta.__namecall = newcclosure(function(self, ...)
-    local method = getnamecallmethod()
-    if method == "Kick" or method == "kick" then
-        return
-    end
-    return oldNamecall(self, ...)
-end)
+-- Save & Interface Manager
+SaveManager:SetLibrary(Library)
+InterfaceManager:SetLibrary(Library)
+SaveManager:IgnoreThemeSettings()
+SaveManager:SetIgnoreIndexes({})
+InterfaceManager:SetFolder("ESP_Fly_Config")
+SaveManager:SetFolder("ESP_Fly_Config")
+SaveManager:BuildConfigSection(Tabs.Settings)
+InterfaceManager:ApplyToTab(Tabs.Settings)
 
-setreadonly(meta, true)
-
-print("✅ Script carregado com sucesso!")
+Library:Notify("Carregado! Use a UI para controlar ESP e Fly.")
